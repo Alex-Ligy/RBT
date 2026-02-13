@@ -1,0 +1,76 @@
+# =============================================================================
+# Configuration for RBT Semantic Segmentation
+# Paper: "AI-Assisted Determination of Rolling Bottle Test Results
+#         Using Centroid Sampling based Deep Learning"
+# Standard: EN 12697-11
+# =============================================================================
+
+model:
+  name: "DeepLabv3+"
+  backbone: "resnet101"
+  output_stride: 16          # Options: 8 or 16. OS=8 gives finer detail but more memory.
+  pretrained_backbone: true   # Use ImageNet pre-trained weights
+  num_classes: 3              # 0: Background, 1: Aggregate/Stone (stripped), 2: Bitumen
+
+training:
+  epochs: 200
+  batch_size: 8
+  optimizer:
+    type: "SGD"
+    lr: 0.01                  # Initial learning rate
+    momentum: 0.9
+    weight_decay: 0.0005
+  lr_scheduler:
+    type: "poly"              # Poly learning rate policy: lr = lr_base * (1 - iter/max_iter)^power
+    power: 0.9
+  loss:
+    ce_weight: [0.5, 5.0, 1.0]   # Class weights for CrossEntropy [BG, Aggregate, Bitumen]
+    contrastive_weight: 0.1       # Lambda for Local Contrastive Loss
+    contrastive_temperature: 0.07 # Temperature parameter tau
+    contrastive_neighborhood: 15  # Local neighborhood size (pixels)
+    contrastive_num_samples: 256  # Number of sampled pixel pairs per image
+
+data:
+  root_dir: "./dataset"       # Root directory containing images/ and masks/
+  image_dir: "images"
+  mask_dir: "masks"
+  input_size: 512             # Crop/resize to 512x512
+  num_workers: 4
+  train_split: 0.8            # 80% train, 20% val
+  pin_memory: true
+
+centroid_sampling:
+  enabled: true
+  minority_class: 1           # Class 1 = Aggregate (stripped area, minority)
+  crop_size: 512
+  centroid_jitter: 50         # Random jitter (pixels) around the centroid
+  fallback_to_random: true    # If no minority class pixels, use random crop
+
+augmentation:
+  horizontal_flip: true
+  vertical_flip: true
+  random_rotate_90: true
+  gaussian_noise:
+    enabled: true
+    var_limit: [10.0, 50.0]   # Simulates camera sensor grain
+  color_jitter:
+    enabled: true
+    brightness: 0.2
+    contrast: 0.2
+
+evaluation:
+  sliding_window:
+    enabled: true
+    window_size: 512
+    stride: 256               # 50% overlap
+  save_overlay: true
+  overlay_alpha: 0.5
+
+logging:
+  log_dir: "./logs"
+  checkpoint_dir: "./checkpoints"
+  log_interval: 10            # Log every N batches
+  save_best_metric: "miou"    # Save model with best mIoU
+
+seed: 42
+device: "cuda"                # "cuda" or "cpu"
